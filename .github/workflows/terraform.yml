@@ -22,11 +22,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Set Variables
+      - name: Extract Variables From Issue Body
         run: |
           echo "TICKET_ID=ISSUE-${{ github.event.issue.number }}" >> $GITHUB_ENV
-          echo "INSTANCE_TYPE=t2.micro" >> $GITHUB_ENV
-          echo "INSTANCE_COUNT=2" >> $GITHUB_ENV
+
+          BODY="${{ github.event.issue.body }}"
+
+          INSTANCE_TYPE=$(echo "$BODY" | grep instance_type | cut -d'=' -f2)
+          INSTANCE_COUNT=$(echo "$BODY" | grep instance_count | cut -d'=' -f2)
+
+          # Validation
+          if [ -z "$INSTANCE_TYPE" ]; then
+            echo "ERROR: instance_type not provided in issue body"
+            exit 1
+          fi
+
+          if [ -z "$INSTANCE_COUNT" ]; then
+            echo "ERROR: instance_count not provided in issue body"
+            exit 1
+          fi
+
+          # Guardrail (max 5 servers)
+          if [ "$INSTANCE_COUNT" -gt 5 ]; then
+            echo "ERROR: Maximum 5 servers allowed"
+            exit 1
+          fi
+
+          echo "INSTANCE_TYPE=$INSTANCE_TYPE" >> $GITHUB_ENV
+          echo "INSTANCE_COUNT=$INSTANCE_COUNT" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
